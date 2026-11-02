@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tradehub: Firms and Buyers Marketplace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --ink: #15231d;
+    --bg: #eef1ec;
+    --card: #ffffff;
+    --moss: #1f5c4a;
+    --moss-dark: #164536;
+    --ochre: #d9a441;
+    --muted: #5f6b64;
+    --line: #d5dcd5;
+    --danger: #a3372a;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: Inter, system-ui, sans-serif; font-size: 15px;
+    line-height: 1.55; background: var(--bg); color: var(--ink);
+  }
+  h1, h2, h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; margin: 0 0 .5rem; line-height: 1.2; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.15rem; }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+    padding: 14px 28px; background: var(--bg); border-bottom: 1px solid var(--line);
+  }
+  .brand { font-family: Fraunces, Georgia, serif; font-size: 1.6rem; font-weight: 700; color: var(--moss); margin: 0; }
+  .brand span { color: var(--ochre); }
+  .session { font-size: 14px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .session strong { color: var(--ink); }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+  .intro { display: grid; grid-template-columns: 1.2fr 1fr; gap: 28px; align-items: start; margin-bottom: 32px; }
+  .intro p.lede { font-size: 1.05rem; color: var(--muted); max-width: 52ch; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 22px; }
+
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--muted); }
+  input, select, textarea {
+    display: block; width: 100%; margin-top: 4px; font: inherit; font-size: 15px; color: var(--ink);
+    padding: 9px 11px; border: 1px solid var(--line); border-radius: 4px; background: #fff;
+  }
+  textarea { resize: vertical; }
+  input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
+    outline: 3px solid var(--ochre); outline-offset: 2px;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > * { flex: 1; }
+  button {
+    font: inherit; font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 4px;
+    border: 1px solid var(--moss); background: var(--moss); color: #fff; cursor: pointer;
+  }
+  button:hover { background: var(--moss-dark); }
+  button.ghost { background: transparent; color: var(--moss); }
+  button.ghost:hover { background: #e3ebe5; }
+  button.small { padding: 6px 11px; font-size: 13px; }
+  button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .link-btn { background: none; border: 0; color: var(--moss); padding: 0; text-decoration: underline; font-weight: 500; }
+  .link-btn:hover { background: none; color: var(--moss-dark); }
+
+  nav.tabs { display: flex; gap: 6px; margin-bottom: 22px; border-bottom: 1px solid var(--line); }
+  nav.tabs button {
+    background: none; color: var(--muted); border: 0; border-bottom: 3px solid transparent;
+    border-radius: 0; padding: 10px 14px;
+  }
+  nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ochre); }
+  nav.tabs button:hover { background: none; color: var(--ink); }
+  section.view { display: none; }
+  section.view.active { display: block; }
+
+  .filters { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .filters label { margin: 0; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 18px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .card .firm { font-size: 13px; color: var(--muted); }
+  .card .desc { color: var(--muted); font-size: 14px; flex: 1; }
+  .card .price { font-family: Fraunces, Georgia, serif; font-size: 1.3rem; color: var(--moss); }
+  .card .meta { font-size: 13px; color: var(--muted); }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f4ead2; color: #6b4e10; }
+  .empty { color: var(--muted); padding: 30px 0; text-align: center; grid-column: 1 / -1; }
+
+  .dash { display: grid; grid-template-columns: 1fr 1.4fr; gap: 24px; align-items: start; }
+  .list { display: flex; flex-direction: column; gap: 12px; }
+  .item { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+  .item .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .item p { margin: 4px 0; color: var(--muted); font-size: 14px; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; text-transform: capitalize; }
+  .pill.pending { background: #f4ead2; color: #6b4e10; }
+  .pill.accepted { background: #d7ebe1; color: var(--moss); }
+  .pill.declined { background: #f3dcd8; color: var(--danger); }
+  .live { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .live::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--moss);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(31,92,74,.5); }
+    70% { box-shadow: 0 0 0 8px rgba(31,92,74,0); }
+    100% { box-shadow: 0 0 0 0 rgba(31,92,74,0); }
+  }
+  @media (prefers-reduced-motion: reduce) { .live::before { animation: none; } }
+
+  .signup-only { display: none; }
+  .signup-mode .signup-only { display: block; }
+
+  .notice {
+    background: #f4ead2; color: #6b4e10; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 14px;
+  }
+
+  dialog {
+    border: 1px solid var(--line); border-radius: 8px; padding: 24px; width: min(420px, 92vw);
+    background: #fff; color: var(--ink);
+  }
+  dialog::backdrop { background: rgba(21,35,29,.45); }
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 140%);
+    background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 6px;
+    transition: transform .3s ease; z-index: 50; font-size: 14px; max-width: 90vw;
+  }
+  #toast.show { transform: translate(-50%, 0); }
+
+  @media (max-width: 800px) {
+    .intro, .dash, .filters { grid-template-columns: 1fr; }
+    header, main { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 class="brand">Trade<span>hub</span></h1>
+  <div class="session" id="session"></div>
+</header>
+
+<main>
+  <div id="configNotice" class="notice" style="display:none">
+    Supabase is not configured yet. Open <code>index.html</code> and set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>.
+  </div>
+
+  <div class="intro" id="intro">
+    <div>
+      <h2>Buy directly from firms.</h2>
+      <p class="lede">Firms post what they sell. Buyers send requests with a quantity and a message. Firms accept or decline, and both sides see the update right away.</p>
+      <span class="live">Live updates on</span>
+    </div>
+
+    <div class="panel" id="authPanel">
+      <h3 id="authTitle">Sign in</h3>
+      <form id="authForm">
+        <div class="signup-only">
+          <label>Your name
+            <input name="name" maxlength="60" autocomplete="name">
+          </label>
+          <label>I am a
+            <select name="role" id="roleSelect">
+              <option value="buyer">Buyer looking for products or services</option>
+              <option value="firm">Firm selling products or services</option>
+            </select>
+          </label>
+          <label id="companyField" style="display:none">Company name
+            <input name="company" maxlength="80">
+          </label>
+        </div>
+        <label>Email
+          <input name="email" type="email" required autocomplete="email">
+        </label>
+        <label>Password
+          <input name="password" type="password" required minlength="6" autocomplete="current-password">
+        </label>
+        <button type="submit" id="authSubmit" style="width:100%">Sign in</button>
+      </form>
+      <p style="margin:14px 0 0;font-size:14px;color:var(--muted)">
+        <span id="authSwitchText">New here?</span>
+        <button type="button" class="link-btn" id="authSwitch">Create an account</button>
+      </p>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="market" aria-selected="true">Marketplace</button>
+    <button role="tab" data-tab="dash" id="dashTab" aria-selected="false" style="display:none">My dashboard</button>
+  </nav>
+
+  <section class="view active" id="view-market">
+    <div class="filters">
+      <label>Search
+        <input id="q" type="search" placeholder="Search products or services">
+      </label>
+      <label>Category
+        <select id="cat"><option value="">All categories</option></select>
+      </label>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section class="view" id="view-dash">
+    <div id="dashContent"></div>
+  </section>
+</main>
+
+<dialog id="reqDialog">
+  <form id="reqForm">
+    <h3 id="reqTitle">Request a quote</h3>
+    <label>Quantity needed
+      <input name="qty" type="number" min="1" value="1" required>
+    </label>
+    <label>Message to the firm (optional)
+      <textarea name="message" rows="3" maxlength="500" placeholder="Delivery date, specifications, questions"></textarea>
+    </label>
+    <div class="row">
+      <button type="button" class="ghost" id="reqCancel">Cancel</button>
+      <button type="submit" id="reqSubmit">Send request</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* =====================================================================
+   1. CONFIGURATION
+   Get these from: Supabase Dashboard > Project Settings > API
+   The anon key is safe to put in a website. Security is enforced by
+   the Row Level Security rules in supabase-schema.sql.
+   ===================================================================== */
+const SUPABASE_URL = 'https://tmdqljkcjchfdbbfxrtf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtZHFsamtjamNoZmRiYmZ4cnRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MzU1OTUsImV4cCI6MjEwOTExMTU5NX0.F3yRWtUttY-jgcKRLWttJVlhWpsQaFBeqy2EZz9Hbho';
+const CURRENCY = 'ETB';
+const CATEGORIES = ['Agriculture', 'Coffee & Tea', 'Textiles', 'Leather', 'Construction', 'Technology', 'Services', 'Food & Beverage', 'Other'];
+
+const configured = !SUPABASE_URL.includes('YOUR-PROJECT-ID') && !SUPABASE_ANON_KEY.includes('YOUR-ANON');
+if (!configured) document.getElementById('configNotice').style.display = 'block';
+
+const sb = configured ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+/* =====================================================================
+   2. STATE AND HELPERS
+   ===================================================================== */
+let user = null;
+let profile = null;
+let listings = [];
+let requests = [];
+let activeTab = 'market';
+let authMode = 'signin';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => `${CURRENCY} ${Number(n).toLocaleString('en-US')}`;
+const when = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+/* =====================================================================
+   3. LOADING DATA FROM SUPABASE
+   Row Level Security decides what each user is allowed to see.
+   ===================================================================== */
+async function loadProfile() {
+  profile = null;
+  if (!user) return;
+  const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  if (error) toast(error.message);
+  profile = data;
+}
+
+async function refreshData() {
+  const [l, r] = await Promise.all([
+    sb.from('listings').select('*').order('created_at', { ascending: false }),
+    sb.from('requests').select('*, listings(title, unit, firm_name)').order('created_at', { ascending: false })
+  ]);
+  if (l.error) toast(l.error.message); else listings = l.data;
+  if (r.error) toast(r.error.message); else requests = r.data;
+  render();
+}
+
+/* Live updates: whenever any listing or request changes in the
+   database, reload the data so every open browser shows it. */
+let refreshTimer = null;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(refreshData, 250);
+}
+
+function startRealtime() {
+  sb.channel('tradehub-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, scheduleRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, scheduleRefresh)
+    .subscribe();
+}
+
+/* =====================================================================
+   4. AUTHENTICATION
+   ===================================================================== */
+function setAuthMode(mode) {
+  authMode = mode;
+  const isSignup = mode === 'signup';
+  document.getElementById('authPanel').classList.toggle('signup-mode', isSignup);
+  $('#authTitle').textContent = isSignup ? 'Create an account' : 'Sign in';
+  $('#authSubmit').textContent = isSignup ? 'Create account' : 'Sign in';
+  $('#authSwitchText').textContent = isSignup ? 'Already have an account?' : 'New here?';
+  $('#authSwitch').textContent = isSignup ? 'Sign in' : 'Create an account';
+  $('#authForm').name.required = isSignup;
+  $('#authForm').password.autocomplete = isSignup ? 'new-password' : 'current-password';
+}
+
+$('#authSwitch').addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
+$('#roleSelect').addEventListener('change', e => {
+  $('#companyField').style.display = e.target.value === 'firm' ? 'block' : 'none';
+});
+
+$('#authForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!sb) return toast('Configure Supabase first (see the notice at the top).');
+  const f = Object.fromEntries(new FormData(e.target));
+  const btn = $('#authSubmit');
+  btn.disabled = true;
+
+  try {
+    if (authMode === 'signup') {
+      const name = (f.name || '').trim();
+      const company = (f.company || '').trim();
+      if (!name) return toast('Please enter your name.');
+      if (f.role === 'firm' && !company) return toast('Firms need a company name.');
+
+      const { data, error } = await sb.auth.signUp({
+        email: f.email.trim(),
+        password: f.password,
+        options: { data: { name, role: f.role, company: f.role === 'firm' ? company : '' } }
+      });
+      if (error) return toast(error.message);
+      if (!data.session) toast('Account created. Check your email to confirm it, then sign in.');
+      else toast(`Welcome, ${name}`);
+      setAuthMode('signin');
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email: f.email.trim(), password: f.password });
+      if (error) return toast(error.message);
+    }
+    e.target.reset();
+    $('#companyField').style.display = 'none';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function signOut() {
+  await sb.auth.signOut();
+  activeTab = 'market';
+}
+
+/* =====================================================================
+   5. ACTIONS (each one calls Supabase)
+   ===================================================================== */
+async function postListing(e) {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  if (!f.title.trim()) return toast('Please enter a title.');
+  if (!(Number(f.price) > 0)) return toast('Price must be greater than zero.');
+
+  const { error } = await sb.from('listings').insert({
+    firm_id: user.id,
+    title: f.title.trim(),
+    category: f.category,
+    price: Number(f.price),
+    unit: (f.unit || '').trim() || 'unit',
+    stock: Math.max(0, Number(f.stock) || 0),
+    description: (f.description || '').trim()
+  });
+  if (error) return toast(error.message);
+  e.target.reset();
+  toast('Listing published');
+}
+
+async function deleteListing(id) {
+  if (!confirm('Remove this listing?')) return;
+  const { error } = await sb.from('listings').delete().eq('id', id);
+  if (error) return toast(error.message);
+  toast('Listing removed');
+}
+
+function openRequest(listingId) {
+  const l = listings.find(x => x.id === listingId);
+  if (!l) return;
+  const form = $('#reqForm');
+  form.dataset.listing = listingId;
+  $('#reqTitle').textContent = `Request: ${l.title}`;
+  form.qty.max = l.stock;
+  form.qty.value = 1;
+  form.message.value = '';
+  $('#reqDialog').showModal();
+}
+
+$('#reqCancel').addEventListener('click', () => $('#reqDialog').close());
+$('#reqForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.target;
+  const btn = $('#reqSubmit');
+  btn.disabled = true;
+  const { error } = await sb.rpc('create_request', {
+    p_listing: form.dataset.listing,
+    p_qty: Number(form.qty.value),
+    p_message: form.message.value.trim()
+  });
+  btn.disabled = false;
+  if (error) return toast(error.message);
+  $('#reqDialog').close();
+  toast('Request sent to the firm');
+});
+
+async function respond(requestId, status) {
+  const { error } = await sb.rpc('respond_to_request', { p_request: requestId, p_status: status });
+  if (error) return toast(error.message);
+  toast(status === 'accepted' ? 'Request accepted. Stock updated.' : 'Request declined.');
+}
+
+/* Buttons use data-act attributes, handled in one place */
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const { act, id } = btn.dataset;
+  if (act === 'request') {
+    if (!user) return toast('Sign in as a buyer to send requests.');
+    if (profile?.role !== 'buyer') return toast('Only buyers can send requests.');
+    openRequest(id);
+  }
+  if (act === 'accept') respond(id, 'accepted');
+  if (act === 'decline') respond(id, 'declined');
+  if (act === 'delete') deleteListing(id);
+  if (act === 'signout') signOut();
+});
+
+document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => {
+  activeTab = b.dataset.tab;
+  render();
+}));
+$('#q').addEventListener('input', renderMarket);
+$('#cat').addEventListener('change', renderMarket);
+
+/* =====================================================================
+   6. RENDERING
+   ===================================================================== */
+function render() {
+  renderSession();
+  $('#intro').classList.toggle('hidden-intro', !!user);
+  $('#authPanel').style.display = user ? 'none' : 'block';
+  $('#dashTab').style.display = user ? 'inline-block' : 'none';
+  if (!user && activeTab === 'dash') activeTab = 'market';
+  document.querySelectorAll('nav.tabs button').forEach(b =>
+    b.setAttribute('aria-selected', String(b.dataset.tab === activeTab)));
+  $('#view-market').classList.toggle('active', activeTab === 'market');
+  $('#view-dash').classList.toggle('active', activeTab === 'dash');
+  renderCategories();
+  renderMarket();
+  renderDash();
+}
+
+function renderSession() {
+  const el = $('#session');
+  if (!user) { el.innerHTML = '<span>Browsing as a visitor</span>'; return; }
+  const name = profile?.name || user.email;
+  const who = profile?.role === 'firm'
+    ? `<strong>${esc(profile.company)}</strong> (firm, ${esc(name)})`
+    : `<strong>${esc(name)}</strong> (buyer)`;
+  el.innerHTML = `<span>Signed in as ${who}</span><button class="ghost small" data-act="signout">Sign out</button>`;
+}
+
+function renderCategories() {
+  const sel = $('#cat');
+  const current = sel.value;
+  const cats = [...new Set([...CATEGORIES, ...listings.map(l => l.category)].filter(Boolean))];
+  sel.innerHTML = '<option value="">All categories</option>' +
+    cats.map(c => `<option ${c === current ? 'selected' : ''}>${esc(c)}</option>`).join('');
+}
+
+function renderMarket() {
+  const q = $('#q').value.trim().toLowerCase();
+  const cat = $('#cat').value;
+  const items = listings.filter(l =>
+    (!cat || l.category === cat) &&
+    (!q || `${l.title} ${l.description} ${l.firm_name}`.toLowerCase().includes(q)));
+
+  if (!items.length) {
+    $('#grid').innerHTML = '<div class="empty">No listings match your search yet.</div>';
+    return;
+  }
+
+  $('#grid').innerHTML = items.map(l => {
+    const own = user && l.firm_id === user.id;
+    let action;
+    if (own) action = '<span class="tag">Your listing</span>';
+    else if (l.stock <= 0) action = '<button disabled>Sold out</button>';
+    else if (!user) action = `<button class="ghost" data-act="request" data-id="${esc(l.id)}">Sign in to request</button>`;
+    else if (profile?.role === 'buyer') action = `<button data-act="request" data-id="${esc(l.id)}">Request quote</button>`;
+    else action = '<span class="tag">Firms cannot buy</span>';
+
+    return `
+      <article class="card">
+        <span class="tag">${esc(l.category)}</span>
+        <h3>${esc(l.title)}</h3>
+        <div class="firm">${esc(l.firm_name)}</div>
+        <p class="desc">${esc(l.description)}</p>
+        <div class="price">${money(l.price)} <span style="font-size:13px;color:var(--muted)">/ ${esc(l.unit)}</span></div>
+        <div class="meta">${l.stock} ${esc(l.unit)}(s) in stock</div>
+        <div>${action}</div>
+      </article>`;
+  }).join('');
+}
+
+function renderDash() {
+  if (!user || !profile) { $('#dashContent').innerHTML = ''; return; }
+  if (profile.role === 'firm') renderFirmDash();
+  else renderBuyerDash();
+}
+
+function renderFirmDash() {
+  const mine = listings.filter(l => l.firm_id === user.id);
+  const incoming = requests.filter(r => r.firm_id === user.id);
+  const pending = incoming.filter(r => r.status === 'pending').length;
+
+  $('#dashContent').innerHTML = `
+    <div class="dash">
+      <div>
+        <div class="panel" style="margin-bottom:20px">
+          <h2>Post a listing</h2>
+          <form id="listingForm">
+            <label>Title <input name="title" required maxlength="100" placeholder="What are you selling?"></label>
+            <div class="row">
+              <label>Category
+                <select name="category">${CATEGORIES.map(c => `<option>${esc(c)}</option>`).join('')}</select>
+              </label>
+              <label>Unit <input name="unit" maxlength="20" placeholder="kg, piece, project"></label>
+            </div>
+            <div class="row">
+              <label>Price (${CURRENCY}) <input name="price" type="number" min="1" step="any" required></label>
+              <label>Stock <input name="stock" type="number" min="0" value="1"></label>
+            </div>
+            <label>Description <textarea name="description" rows="3" maxlength="500"></textarea></label>
+            <button type="submit">Publish listing</button>
+          </form>
+        </div>
+
+        <h3>Your listings (${mine.length})</h3>
+        <div class="list">
+          ${mine.length ? mine.map(l => `
+            <div class="item">
+              <div class="head"><strong>${esc(l.title)}</strong><span class="tag">${esc(l.category)}</span></div>
+              <p>${money(l.price)} / ${esc(l.unit)} · ${l.stock} in stock</p>
+              <div class="actions"><button class="danger small" data-act="delete" data-id="${esc(l.id)}">Remove</button></div>
+            </div>`).join('') : '<p class="empty" style="padding:10px 0">You have not posted anything yet.</p>'}
+        </div>
+      </div>
+
+      <div>
+        <h3>Incoming requests <span class="live" style="margin-left:6px">${pending} pending</span></h3>
+        <div class="list">
+          ${incoming.length ? incoming.map(r => `
+            <div class="item">
+              <div class="head">
+                <strong>${esc(r.buyer_name)}</strong>
+                <span class="pill ${esc(r.status)}">${esc(r.status)}</span>
+              </div>
+              <p>Wants <strong>${r.qty} ${esc(r.listings?.unit)}(s)</strong> of ${esc(r.listings?.title)} at ${money(r.unit_price)} each</p>
+              ${r.message ? `<p>“${esc(r.message)}”</p>` : ''}
+              <p>${when(r.created_at)}</p>
+              ${r.status === 'pending' ? `
+                <div class="actions">
+                  <button class="small" data-act="accept" data-id="${esc(r.id)}">Accept</button>
+                  <button class="ghost small" data-act="decline" data-id="${esc(r.id)}">Decline</button>
+                </div>` : ''}
+            </div>`).join('') : '<p class="empty" style="padding:10px 0">No requests yet. Buyers will appear here when they reach out.</p>'}
+        </div>
+      </div>
+    </div>`;
+
+  $('#listingForm').addEventListener('submit', postListing);
+}
+
+function renderBuyerDash() {
+  const mine = requests.filter(r => r.buyer_id === user.id);
+  $('#dashContent').innerHTML = `
+    <h2>Your requests</h2>
+    <p style="color:var(--muted);margin-bottom:18px">Track the status of each request you have sent to a firm.</p>
+    <div class="list" style="max-width:720px">
+      ${mine.length ? mine.map(r => `
+        <div class="item">
+          <div class="head">
+            <strong>${esc(r.listings?.title)}</strong>
+            <span class="pill ${esc(r.status)}">${esc(r.status)}</span>
+          </div>
+          <p>${esc(r.listings?.firm_name)} · ${r.qty} ${esc(r.listings?.unit)}(s) at ${money(r.unit_price)} each · ${when(r.created_at)}</p>
+          ${r.message ? `<p>Your message: “${esc(r.message)}”</p>` : ''}
+        </div>`).join('') : `
+        <div class="empty" style="padding:10px 0">You have not sent any requests yet.
+          <div style="margin-top:10px"><button class="ghost" onclick="activeTab='market';render()">Browse listings</button></div>
+        </div>`}
+    </div>`;
+}
+
+/* =====================================================================
+   7. START
+   ===================================================================== */
+if (sb) {
+  sb.auth.onAuthStateChange(async (_event, session) => {
+    user = session?.user ?? null;
+    await loadProfile();
+    if (!user && activeTab === 'dash') activeTab = 'market';
+    await refreshData();
+  });
+  startRealtime();
+}
+setAuthMode('signin');
+render();
+</script>
+</body>
+</html>
